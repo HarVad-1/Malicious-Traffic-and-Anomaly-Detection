@@ -12,6 +12,10 @@ import psutil
 import tempfile
 from fpdf import FPDF
 import logging
+import google.generativeai as genai
+import joblib
+import pandas as pd
+import numpy as np
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG, 
@@ -21,6 +25,33 @@ logger = logging.getLogger('snort-dashboard')
 
 app = Flask(__name__, static_folder='static')
 CORS(app)  # Enable CORS for all routes
+
+# Configure Google Generative AI API
+GOOGLE_API_KEY= "AIzaSyCeSOVKuf2Gv_VvqQkEWhYGDyg-5vUrtEk"  # Replace with your actual API key  # Replace with your actual API key
+genai.configure(api_key=GOOGLE_API_KEY)
+
+# Create models directory if it doesn't exist
+os.makedirs('models', exist_ok=True)
+
+# Load ML models if available
+try:
+    if os.path.exists('models/malicious_traffic_model.pkl'):
+        malicious_traffic_model = joblib.load('models/malicious_traffic_model.pkl')
+        logger.info("Malicious traffic model loaded successfully")
+    else:
+        malicious_traffic_model = None
+        logger.warning("Malicious traffic model file not found")
+        
+    if os.path.exists('models/anomaly_detection_model.pkl'):
+        anomaly_detection_model = joblib.load('models/anomaly_detection_model.pkl')
+        logger.info("Anomaly detection model loaded successfully")
+    else:
+        anomaly_detection_model = None
+        logger.warning("Anomaly detection model file not found")
+except Exception as e:
+    logger.error(f"Error loading ML models: {str(e)}", exc_info=True)
+    malicious_traffic_model = None
+    anomaly_detection_model = None
 
 # Serve static files
 @app.route('/')
@@ -43,14 +74,125 @@ source_ips = {}
 alert_types = {
     'ICMP': 0,
     'TCP': 0,
-    'UDP': 0, 
-    'Attack': 0,
+    'UDP': 0,
+    'Ping of Death': 0,
+    'Ping Flood': 0,
+    'SSH Attack': 0,
+    'Nmap Scan': 0,
+    'SQL Injection': 0,
+    'XSS Attack': 0,
     'Other': 0
 }
 
+# Chatbot system prompt
+CHATBOT_SYSTEM_PROMPT = """
+You are a Snort rule generation assistant. Generate valid, efficient Snort rules based on user descriptions.
+Follow these guidelines:
+1. Each rule should have correct syntax for the latest Snort version
+2. Include header (action, protocol, IP addresses, ports) and rule options
+3. Use appropriate Snort keywords and options
+4. ALWAYS include the 'msg:' option with a descriptive message
+5. ALWAYS include the 'sid:' option with a unique ID above 1000000
+6. For complex scenarios, provide multiple rules if needed
+7. Format your response as pure Snort rules without markdown code blocks
+
+Example of a properly formatted rule:
+alert tcp any any -> any 80 (msg:"SQL Injection Attempt"; content:"union select"; nocase; sid:1000001; rev:1;)
+
+Format your response as valid Snort rules only. Do not include explanations outside of comments.
+"""
+
+def get_gemini_model():
+    """Get the appropriate Gemini model."""
+    return "models/gemini-1.5-flash"
+
+def generate_snort_rule(prompt):
+    """
+    Generate Snort rules using Gemini API based on user input
+    """
+    try:
+        # Get the correct model name
+        model_name = get_gemini_model()
+        
+        # Log the model being used
+        logger.info(f"Using model: {model_name}")
+        logger.info(f"Generating rule for prompt: {prompt}")
+        
+        # Initialize the model
+        model = genai.GenerativeModel(model_name)
+        
+        # Create a comprehensive prompt for Gemini
+        complete_prompt = f"{CHATBOT_SYSTEM_PROMPT}\n\nUser request: {prompt}\n\nGenerate appropriate Snort rule(s):"
+        logger.info(f"Complete prompt (first 100 chars): {complete_prompt[:100]}...")
+        
+        # Generate content with safety settings
+        generation_config = {
+            "temperature": 0.2,
+            "top_p": 0.8,
+            "top_k": 40,
+            "max_output_tokens": 1024,
+        }
+        
+        safety_settings = [
+            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
+            {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
+            {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
+            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
+        ]
+        
+        logger.info("Sending request to Gemini API...")
+        response = model.generate_content(
+            complete_prompt,
+            generation_config=generation_config,
+            safety_settings=safety_settings
+        )
+        
+        logger.info(f"Response received (first 100 chars): {response.text[:100]}...")
+        return response.text
+    except Exception as e:
+        # Include detailed error information
+        error_msg = f"Error generating Snort rule: {str(e)}"
+        if hasattr(e, 'status_code'):
+            error_msg += f" (Status code: {e.status_code})"
+        logger.error(error_msg, exc_info=True)
+        return error_msg
+
+def validate_rule(rule_text):
+    """
+    Basic validation of Snort rule syntax
+    """
+    # Check for common syntax elements
+    if not rule_text or len(rule_text) < 10:
+        return False, "Rule is too short"
+    
+    # Check if this is a code block or has formatting from Gemini
+    rule_text = rule_text.replace("```", "").strip()
+    
+    # Some rules might be in a comment or explanation
+    # Extract the actual rule if possible
+    lines = rule_text.split("\n")
+    rule_lines = [line for line in lines if line.strip() and not line.strip().startswith("#")]
+    
+    if not rule_lines:
+        return False, "No valid rule found"
+    
+    # Join multiple lines if needed
+    rule_text = " ".join(rule_lines)
+    
+    # Basic format checks
+    if "alert" not in rule_text and "log" not in rule_text and "drop" not in rule_text and "reject" not in rule_text and "pass" not in rule_text:
+        return False, "Missing valid action (alert, log, drop, reject, pass)"
+    
+    if "->" not in rule_text:
+        return False, "Missing direction operator (->)"
+    
+    if "(" not in rule_text or ")" not in rule_text:
+        return False, "Missing rule options parentheses"
+    
+    return True, "Rule syntax looks valid"
+
 def parse_alert_line(line):
-    """Parse a line from Snort's alert output"""
-    # This is a simplified parser and would need to be adapted to your actual Snort output format
+    """Parse a line from Snort's alert output with more accurate pattern matching"""
     alert = {
         'timestamp': '',
         'type': 'Other',
@@ -70,27 +212,46 @@ def parse_alert_line(line):
     message_match = re.search(r'\[\*\*\] \[.*\] (.*) \[\*\*\]', line)
     if message_match:
         alert['message'] = message_match.group(1)
+        message = message_match.group(1).lower()
+        
+        # Classify based on message content
+        line_lower = line.lower()
+        
+        # Protocol identification
+        if "icmp" in line_lower:
+            alert['protocol'] = 'ICMP'
+            
+            # More specific ICMP attack types
+            if any(x in message for x in ["ping of death", "oversized", "large"]):
+                alert['type'] = 'Ping of Death'
+            elif any(x in message for x in ["ping flood", "flood", "destination unreachable flood"]):
+                alert['type'] = 'Ping Flood'
+            else:
+                alert['type'] = 'ICMP'
+                
+        elif "tcp" in line_lower:
+            alert['protocol'] = 'TCP'
+            alert['type'] = 'TCP'
+            
+        elif "udp" in line_lower:
+            alert['protocol'] = 'UDP'
+            alert['type'] = 'UDP'
+        
+        # Attack type identification
+        if "ssh" in message or "suspicious ssh" in message:
+            alert['type'] = 'SSH Attack'
+            
+        elif any(x in message for x in ["scan", "sweep", "port scan", "nmap"]):
+            alert['type'] = 'Nmap Scan'
+            
+        elif any(x in message for x in ["sql", "injection", "sql injection", "or 1=1"]):
+            alert['type'] = 'SQL Injection'
+            
+        elif any(x in message for x in ["xss", "cross-site", "script", "<script>"]):
+            alert['type'] = 'XSS Attack'
     
-    # Extract protocol and classify type
-    if 'ICMP' in line:
-        alert['protocol'] = 'ICMP'
-        alert['type'] = 'ICMP'
-    elif 'TCP' in line:
-        alert['protocol'] = 'TCP'
-        alert['type'] = 'TCP'
-    elif 'UDP' in line:
-        alert['protocol'] = 'UDP'
-        alert['type'] = 'UDP'
-    
-    # Check if it's an attack alert
-    attack_keywords = ['attack', 'exploit', 'scan', 'injection', 'overflow', 'xss', 'breach', 
-                      'brute force', 'malware', 'backdoor', 'trojan', 'ransomware', 'shellcode']
-    
-    if any(keyword in line.lower() for keyword in attack_keywords):
-        alert['type'] = 'Attack'
-    
-    # Extract IP addresses (simplified - would need improvement for a real implementation)
-    ip_match = re.search(r'(\d+\.\d+\.\d+\.\d+) -> (\d+\.\d+\.\d+\.\d+)', line)
+    # Extract IP addresses
+    ip_match = re.search(r'(\d+\.\d+\.\d+\.\d+).*?(\d+\.\d+\.\d+\.\d+)', line)
     if ip_match:
         alert['source'] = ip_match.group(1)
         alert['destination'] = ip_match.group(2)
@@ -141,7 +302,8 @@ def monitor_snort_output():
                 alert_types['Other'] += 1
                 
             # Track attack count
-            if alert['type'] == 'Attack':
+            attack_types = ['Ping of Death', 'Ping Flood', 'SSH Attack', 'Nmap Scan', 'SQL Injection', 'XSS Attack']
+            if alert['type'] in attack_types:
                 attack_count += 1
                 
             # Track source IPs
@@ -215,7 +377,12 @@ def start_monitoring():
             'ICMP': 0,
             'TCP': 0,
             'UDP': 0,
-            'Attack': 0,
+            'Ping of Death': 0,
+            'Ping Flood': 0,
+            'SSH Attack': 0,
+            'Nmap Scan': 0,
+            'SQL Injection': 0,
+            'XSS Attack': 0,
             'Other': 0
         }
         
@@ -302,6 +469,157 @@ def get_interfaces():
     
     return jsonify({'interfaces': interfaces})
 
+# Chatbot API endpoint for generating Snort rules
+@app.route('/api/generate-rule', methods=['POST'])
+def api_generate_rule():
+    """API endpoint to generate a Snort rule"""
+    try:
+        data = request.json
+        prompt = data.get('prompt', '')
+        
+        if not prompt:
+            return jsonify({'status': 'error', 'message': 'No prompt provided'}), 400
+            
+        logger.info(f"Generating Snort rule for prompt: {prompt}")
+        
+        # Generate the rule
+        rule = generate_snort_rule(prompt)
+        
+        # Validate the rule
+        is_valid, validation_message = validate_rule(rule)
+        
+        return jsonify({
+            'status': 'success',
+            'rule': rule,
+            'is_valid': is_valid,
+            'validation_message': validation_message
+        })
+    except Exception as e:
+        logger.error(f"Error generating rule: {str(e)}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+# API endpoint for ML-based traffic analysis
+@app.route('/api/analyze-traffic', methods=['POST'])
+def analyze_traffic():
+    """Analyze traffic data using ML models"""
+    try:
+        data = request.json
+        traffic_data = data.get('traffic_data', [])
+        
+        if not traffic_data:
+            return jsonify({'status': 'error', 'message': 'No traffic data provided'}), 400
+            
+        logger.info(f"Analyzing traffic data, {len(traffic_data)} records received")
+        
+        # Convert to DataFrame
+        df = pd.DataFrame(traffic_data)
+        logger.info(f"DataFrame columns: {df.columns.tolist()}")
+        
+        # Preprocess data
+        # This is a simplified example - adjust based on your actual model requirements
+        results = {
+            'malicious_traffic': [],
+            'anomalies': [],
+            'analysis_summary': 'Traffic analysis complete'
+        }
+        
+        # Only run predictions if models are loaded
+        if malicious_traffic_model:
+            try:
+                # This is a placeholder - you need to adjust based on your actual model
+                # Assuming the model expects certain features
+                required_features = ['feature1', 'feature2', 'feature3']  # Replace with actual features
+                
+                # Check if required features exist
+                missing_features = [f for f in required_features if f not in df.columns]
+                if missing_features:
+                    logger.warning(f"Missing features for malicious traffic model: {missing_features}")
+                    # Use placeholder results
+                    mal_predictions = [0] * len(df)
+                else:
+                    # Make predictions (adjust feature selection as needed)
+                    mal_predictions = malicious_traffic_model.predict(df[required_features])
+                
+                results['malicious_traffic'] = mal_predictions.tolist()
+                logger.info(f"Malicious traffic detected: {sum(mal_predictions)}")
+            except Exception as e:
+                logger.error(f"Error running malicious traffic model: {str(e)}", exc_info=True)
+                results['malicious_traffic'] = [0] * len(df)
+        else:
+            logger.warning("Malicious traffic model not available")
+            results['malicious_traffic'] = [0] * len(df)
+            
+        if anomaly_detection_model:
+            try:
+                # This is a placeholder - adjust based on your actual model
+                required_features = ['feature1', 'feature2', 'feature3']  # Replace with actual features
+                
+                # Check if required features exist
+                missing_features = [f for f in required_features if f not in df.columns]
+                if missing_features:
+                    logger.warning(f"Missing features for anomaly detection model: {missing_features}")
+                    # Use placeholder results
+                    anom_predictions = [0] * len(df)
+                else:
+                    # Make predictions (adjust feature selection as needed)
+                    anom_predictions = anomaly_detection_model.predict(df[required_features])
+                
+                results['anomalies'] = anom_predictions.tolist()
+                logger.info(f"Anomalies detected: {sum(1 for x in anom_predictions if x == -1)}")
+            except Exception as e:
+                logger.error(f"Error running anomaly detection model: {str(e)}", exc_info=True)
+                results['anomalies'] = [0] * len(df)
+        else:
+            logger.warning("Anomaly detection model not available")
+            results['anomalies'] = [0] * len(df)
+        
+        # Generate Snort rules based on detected patterns
+        suggested_rules = []
+        
+        # Check if we detected any suspicious activity
+        has_malicious = any(x == 1 for x in results['malicious_traffic'])
+        has_anomalies = any(x == -1 for x in results['anomalies'])
+        
+        if has_malicious or has_anomalies:
+            # Build a prompt based on what we found
+            rule_prompt = "Create a Snort rule to detect "
+            
+            if has_malicious:
+                mal_count = sum(1 for x in results['malicious_traffic'] if x == 1)
+                rule_prompt += f"malicious traffic (detected {mal_count} instances) "
+                
+                # Add some context if available (this would depend on your data)
+                if 'src_ip' in df.columns:
+                    suspicious_ips = df.loc[results['malicious_traffic'] == 1, 'src_ip'].unique().tolist()
+                    if suspicious_ips:
+                        rule_prompt += f"from these source IPs: {', '.join(suspicious_ips[:5])} "
+                
+            if has_anomalies:
+                anom_count = sum(1 for x in results['anomalies'] if x == -1)
+                if has_malicious:
+                    rule_prompt += "and "
+                rule_prompt += f"anomalous network behavior (detected {anom_count} instances) "
+            
+            # Generate the rule
+            logger.info(f"Generating rule with prompt: {rule_prompt}")
+            suggested_rule = generate_snort_rule(rule_prompt)
+            suggested_rules.append(suggested_rule)
+        
+        return jsonify({
+            'status': 'success',
+            'results': results,
+            'suggested_rules': suggested_rules
+        })
+        
+    except Exception as e:
+        logger.error(f"Error analyzing traffic: {str(e)}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+# Endpoint to render chatbot page
+@app.route('/rule-generator')
+def rule_generator():
+    return send_from_directory('static', 'rule-generator.html')
+
 @app.route('/debug')
 def debug_view():
     """Debug view to help troubleshoot issues"""
@@ -348,6 +666,11 @@ def debug_view():
         output += "<pre>" + rules + "</pre>"
     except Exception as e:
         output += f"<p>Error reading rules: {str(e)}</p>"
+    
+    # AI model status
+    output += "<h2>AI Models Status</h2>"
+    output += f"<p>Malicious Traffic Model: {'Loaded' if malicious_traffic_model else 'Not Loaded'}</p>"
+    output += f"<p>Anomaly Detection Model: {'Loaded' if anomaly_detection_model else 'Not Loaded'}</p>"
     
     return output
 

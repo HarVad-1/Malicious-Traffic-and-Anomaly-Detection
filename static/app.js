@@ -10,7 +10,12 @@ let alertTypes = {
     'ICMP': 0,
     'TCP': 0,
     'UDP': 0,
-    'Attack': 0,
+    'Ping of Death': 0,
+    'Ping Flood': 0,
+    'SSH Attack': 0,
+    'Nmap Scan': 0,
+    'SQL Injection': 0,
+    'XSS Attack': 0,
     'Other': 0
 };
 
@@ -49,7 +54,12 @@ function initCharts() {
                     '#ffc107', // ICMP - yellow
                     '#17a2b8', // TCP - cyan
                     '#28a745', // UDP - green
-                    '#dc3545', // Attack - red
+                    '#ff6b6b', // Ping of Death - light red
+                    '#fd7e14', // Ping Flood - orange
+                    '#6f42c1', // SSH Attack - purple
+                    '#20c997', // Nmap Scan - teal
+                    '#e83e8c', // SQL Injection - pink
+                    '#dc3545', // XSS Attack - red
                     '#6c757d'  // Other - gray
                 ],
                 borderWidth: 1
@@ -61,6 +71,10 @@ function initCharts() {
             plugins: {
                 legend: {
                     position: 'right',
+                    labels: {
+                        boxWidth: 12,
+                        padding: 15
+                    }
                 }
             }
         }
@@ -313,7 +327,30 @@ function updateCounters() {
 function addAlertToLog(alert) {
     // Create a new row
     const row = document.createElement('tr');
-    row.className = alert.type.toLowerCase();
+    
+    // Set the appropriate class based on the alert type
+    switch(alert.type.toLowerCase()) {
+        case 'ping of death':
+            row.className = 'ping-of-death';
+            break;
+        case 'ping flood':
+            row.className = 'ping-flood';
+            break;
+        case 'ssh attack':
+            row.className = 'ssh-attack';
+            break;
+        case 'nmap scan':
+            row.className = 'nmap-scan';
+            break;
+        case 'sql injection':
+            row.className = 'sql-injection';
+            break;
+        case 'xss attack':
+            row.className = 'xss-attack';
+            break;
+        default:
+            row.className = alert.type.toLowerCase();
+    }
     
     // Format timestamp
     const timestamp = alert.timestamp || new Date().toLocaleTimeString();

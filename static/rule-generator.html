@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Snort Rule Generator</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .card {
+            margin-bottom: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .chat-container {
+            height: 400px;
+            overflow-y: auto;
+            padding: 15px;
+            background-color: #fff;
+            border-radius: 10px;
+            border: 1px solid #e0e0e0;
+        }
+        .chat-message {
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            max-width: 80%;
+        }
+        .user-message {
+            background-color: #f0f2f6;
+            margin-left: auto;
+        }
+        .bot-message {
+            background-color: #e6f3ff;
+        }
+        .rule-display {
+            background-color: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            margin-top: 10px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .template-card {
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .template-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+        }
+        .nav-tabs .nav-link {
+            border-radius: 10px 10px 0 0;
+        }
+        .nav-tabs .nav-link.active {
+            background-color: #f0f7ff;
+            border-bottom-color: #f0f7ff;
+        }
+        .tab-content {
+            background-color: #f0f7ff;
+            border-radius: 0 0 10px 10px;
+            padding: 20px;
+            border: 1px solid #dee2e6;
+            border-top: none;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-shield-alt me-2"></i>Snort IDS Dashboard
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/rule-generator">Rule Generator</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h4><i class="fas fa-robot me-2"></i>Snort Rule Generator</h4>
+                    </div>
+                    <div class="card-body">
+                        <p>Use AI-powered tools to generate and analyze Snort rules for protecting your network.</p>
+                        
+                        <ul class="nav nav-tabs" id="myTab" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="chat-tab" data-bs-toggle="tab" data-bs-target="#chat" type="button" role="tab" aria-controls="chat" aria-selected="true">
+                                    <i class="fas fa-comments me-2"></i>Chat Generator
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="ai-tab" data-bs-toggle="tab" data-bs-target="#ai" type="button" role="tab" aria-controls="ai" aria-selected="false">
+                                    <i class="fas fa-brain me-2"></i>AI Analysis
+                                </button>
+                            </li>
+                        </ul>
+                        
+                        <div class="tab-content" id="myTabContent">
+                            <!-- Chat Generator Tab -->
+                            <div class="tab-pane fade show active" id="chat" role="tabpanel" aria-labelledby="chat-tab">
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <div class="card">
+                                            <div class="card-header">
+                                                <h5><i class="fas fa-list-alt me-2"></i>Rule Templates</h5>
+                                            </div>
+                                            <div class="card-body">
+                                                <div class="row">
+                                                    <div class="col-12 mb-3">
+                                                        <div class="template-card card p-3" data-template="Detect SQL Injection">
+                                                            <div class="d-flex align-items-center">
+                                                                <i class="fas fa-database text-danger me-3 fs-4"></i>
+                                                                <div>
+                                                                    <h6 class="mb-0">Detect SQL Injection</h6>
+                                                                    <small class="text-muted">Detect SQL injection attempts in web traffic</small>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-12 mb-3">
+                                                        <div class="template-card card p-3" data-template="Block Specific IP">
+                                                            <div class="d-flex align-items-center">
+                                                                <i class="fas fa-ban text-warning me-3 fs-4"></i>
+                                                                <div>
+                                                                    <h6 class="mb-0">Block Specific IP</h6>
+                                                                    <small class="text-muted">Block traffic from a suspicious IP address</small>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-12 mb-3">
+                                                        <div class="template-card card p-3" data-template="Detect Malware Communication">
+                                                            <div class="d-flex align-items-center">
+                                                                <i class="fas fa-bug text-danger me-3 fs-4"></i>
+                                                                <div>
+                                                                    <h6 class="mb-0">Detect Malware Communication</h6>
+                                                                    <small class="text-muted">Identify C2 communication patterns</small>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-12 mb-3">
+                                                        <div class="template-card card p-3" data-template="Monitor Specific Protocol">
+                                                            <div class="d-flex align-items-center">
+                                                                <i class="fas fa-network-wired text-primary me-3 fs-4"></i>
+                                                                <div>
+                                                                    <h6 class="mb-0">Monitor Specific Protocol</h6>
+                                                                    <small class="text-muted">Track activity on a specific network protocol</small>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-12 mb-3">
+                                                        <div class="template-card card p-3" data-template="Detect XSS Attacks">
+                                                            <div class="d-flex align-items-center">
+                                                                <i class="fas fa-code text-info me-3 fs-4"></i>
+                                                                <div>
+                                                                    <h6 class="mb-0">Detect XSS Attacks</h6>
+                                                                    <small class="text-muted">Identify cross-site scripting attempts</small>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-8">
+                                        <div class="card">
+                                            <div class="card-header">
+                                                <h5><i class="fas fa-comments me-2"></i>Chat with Rule Generator</h5>
+                                            </div>
+                                            <div class="card-body">
+                                                <div class="chat-container" id="chatContainer">
+                                                    <div class="bot-message chat-message">
+                                                        <p>Hello! I'm the Snort Rule Generator assistant. Describe the network threat or condition you want to create a rule for, and I'll help you generate an appropriate Snort rule.</p>
+                                                        <p>You can also select one of the templates from the left panel to get started.</p>
+                                                    </div>
+                                                </div>
+                                                <div class="mt-3">
+                                                    <div class="input-group">
+                                                        <input type="text" id="userInput" class="form-control" placeholder="Describe the threat or condition..." aria-label="User message">
+                                                        <button class="btn btn-primary" type="button" id="sendButton">
+                                                            <i class="fas fa-paper-plane"></i> Send
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="card mt-3" id="ruleCard" style="display: none;">
+                                            <div class="card-header">
+                                                <h5><i class="fas fa-shield-alt me-2"></i>Generated Rule</h5>
+                                            </div>
+                                            <div class="card-body">
+                                                <div class="rule-display" id="ruleDisplay"></div>
+                                                <div class="mt-3 d-flex justify-content-between">
+                                                    <div>
+                                                        <span id="validationMessage" class="badge bg-success">Rule looks valid</span>
+                                                    </div>
+                                                    <div>
+                                                        <button class="btn btn-sm btn-outline-primary me-2" id="copyButton">
+                                                            <i class="fas fa-copy"></i> Copy to Clipboard
+                                                        </button>
+                                                        <button class="btn btn-sm btn-outline-success" id="saveButton">
+                                                            <i class="fas fa-save"></i> Save Rule
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- AI Analysis Tab -->
+                            <div class="tab-pane fade" id="ai" role="tabpanel" aria-labelledby="ai-tab">
+                                <div class="row">
+                                    <div class="col-md-12">
+                                        <div class="card">
+                                            <div class="card-header">
+                                                <h5><i class="fas fa-brain me-2"></i>AI-Powered Traffic Analysis</h5>
+                                            </div>
+                                            <div class="card-body">
+                                                <p>Upload network traffic data to analyze with our AI models and generate suggested rules.</p>
+                                                
+                                                <div class="alert alert-info">
+                                                    <i class="fas fa-info-circle me-2"></i>
+                                                    <strong>Note:</strong> Upload a CSV file containing network traffic data. The file should include features like source IP, destination IP, protocol, port numbers, packet size, etc.
+                                                </div>
+                                                
+                                                <div class="mb-3">
+                                                    <label for="trafficFile" class="form-label">Traffic Data File (CSV)</label>
+                                                    <input class="form-control" type="file" id="trafficFile" accept=".csv">
+                                                </div>
+                                                
+                                                <button id="analyzeTrafficBtn" class="btn btn-primary">
+                                                    <i class="fas fa-network-wired me-1"></i> Analyze Traffic
+                                                </button>
+                                                
+                                                <div id="analysisResult" class="mt-4" style="display:none;">
+                                                    <h6><i class="fas fa-chart-bar me-2"></i>Analysis Results:</h6>
+                                                    <div class="card">
+                                                        <div class="card-body">
+                                                            <ul id="analysisDetails" class="list-group">
+                                                                <!-- Results will be inserted here -->
+                                                            </ul>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div class="mt-4">
+                                                        <h6><i class="fas fa-shield-alt me-2"></i>Suggested Rules:</h6>
+                                                        <div id="suggestedRules" class="rule-display"></div>
+                                                        
+                                                        <div class="mt-3 text-end">
+                                                            <button class="btn btn-sm btn-outline-primary me-2" id="copyAIRuleButton">
+                                                                <i class="fas fa-copy"></i> Copy to Clipboard
+                                                            </button>
+                                                            <button class="btn btn-sm btn-outline-success" id="saveAIRuleButton">
+                                                                <i class="fas fa-save"></i> Save Rule
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Save Rule Modal -->
+    <div class="modal fade" id="saveRuleModal" tabindex="-1" aria-labelledby="saveRuleModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="saveRuleModalLabel">Save Snort Rule</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="ruleName" class="form-label">Rule Name</label>
+                        <input type="text" class="form-control" id="ruleName" placeholder="Enter a name for this rule">
+                    </div>
+                    <div class="mb-3">
+                        <label for="ruleDescription" class="form-label">Description (Optional)</label>
+                        <textarea class="form-control" id="ruleDescription" rows="3" placeholder="Enter a description for this rule"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="confirmSaveButton">Save Rule</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Global variables
+        let currentRule = '';
+        let isRuleValid = false;
+        const saveRuleModal = new bootstrap.Modal(document.getElementById('saveRuleModal'));
+        
+        // DOM Elements
+        const chatContainer = document.getElementById('chatContainer');
+        const userInput = document.getElementById('userInput');
+        const sendButton = document.getElementById('sendButton');
+        const ruleCard = document.getElementById('ruleCard');
+        const ruleDisplay = document.getElementById('ruleDisplay');
+        const validationMessage = document.getElementById('validationMessage');
+        const copyButton = document.getElementById('copyButton');
+        const saveButton = document.getElementById('saveButton');
+        const confirmSaveButton = document.getElementById('confirmSaveButton');
+        const templateCards = document.querySelectorAll('.template-card');
+        
+        // AI Analysis Elements
+        const analyzeTrafficBtn = document.getElementById('analyzeTrafficBtn');
+        const analysisResult = document.getElementById('analysisResult');
+        const analysisDetails = document.getElementById('analysisDetails');
+        const suggestedRules = document.getElementById('suggestedRules');
+        const copyAIRuleButton = document.getElementById('copyAIRuleButton');
+        const saveAIRuleButton = document.getElementById('saveAIRuleButton');
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add event listeners
+            sendButton.addEventListener('click', sendMessage);
+            userInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    sendMessage();
+                }
+            });
+            
+            copyButton.addEventListener('click', copyRuleToClipboard);
+            saveButton.addEventListener('click', () => {
+                saveRuleModal.show();
+                document.getElementById('ruleName').focus();
+            });
+            confirmSaveButton.addEventListener('click', saveRule);
+            
+            // Add event listeners to template cards
+            templateCards.forEach(card => {
+                card.addEventListener('click', () => {
+                    const template = card.getAttribute('data-template');
+                    userInput.value = `Create a Snort rule to ${template.toLowerCase()}`;
+                    sendMessage();
+                });
+            });
+            
+            // AI Analysis event listeners
+            analyzeTrafficBtn.addEventListener('click', analyzeTraffic);
+            copyAIRuleButton.addEventListener('click', () => {
+                navigator.clipboard.writeText(suggestedRules.textContent)
+                    .then(() => {
+                        const originalText = copyAIRuleButton.innerHTML;
+                        copyAIRuleButton.innerHTML = '<i class="fas fa-check"></i> Copied!';
+                        setTimeout(() => {
+                            copyAIRuleButton.innerHTML = originalText;
+                        }, 2000);
+                    });
+            });
+            saveAIRuleButton.addEventListener('click', () => {
+                currentRule = suggestedRules.textContent;
+                saveRuleModal.show();
+                document.getElementById('ruleName').focus();
+            });
+        });
+        
+        // Send message to chatbot
+        function sendMessage() {
+            const message = userInput.value.trim();
+            if (message === '') return;
+            
+            // Add user message to chat
+            addMessageToChat(message, 'user');
+            
+            // Clear input
+            userInput.value = '';
+            
+            // Add typing indicator
+            const typingIndicator = document.createElement('div');
+            typingIndicator.className = 'bot-message chat-message';
+            typingIndicator.id = 'typingIndicator';
+            typingIndicator.innerHTML = '<p><i class="fas fa-spinner fa-spin"></i> Generating rule...</p>';
+            chatContainer.appendChild(typingIndicator);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            
+            // Send request to backend
+            fetch('/api/generate-rule', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ prompt: message }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Remove typing indicator
+                const indicator = document.getElementById('typingIndicator');
+                if (indicator) indicator.remove();
+                
+                if (data.status === 'success') {
+                    // Add bot response to chat
+                    addMessageToChat('I\'ve generated a Snort rule based on your description:', 'bot');
+                    
+                    // Update rule display
+                    currentRule = data.rule;
+                    isRuleValid = data.is_valid;
+                    
+                    // Display the rule
+                    ruleDisplay.textContent = data.rule;
+                    ruleCard.style.display = 'block';
+                    
+                    // Update validation message
+                    if (data.is_valid) {
+                        validationMessage.className = 'badge bg-success';
+                        validationMessage.textContent = data.validation_message;
+                    } else {
+                        validationMessage.className = 'badge bg-warning';
+                        validationMessage.textContent = data.validation_message;
+                    }
+                    
+                    // Scroll to show the rule
+                    setTimeout(() => {
+                        ruleCard.scrollIntoView({ behavior: 'smooth' });
+                    }, 100);
+                } else {
+                    // Handle error
+                    addMessageToChat(`Sorry, I couldn't generate a rule. Error: ${data.message}`, 'bot');
+                }
+            })
+            .catch(error => {
+                // Remove typing indicator
+                const indicator = document.getElementById('typingIndicator');
+                if (indicator) indicator.remove();
+                
+                // Handle error
+                console.error('Error:', error);
+                addMessageToChat('Sorry, there was an error connecting to the server. Please try again later.', 'bot');
+            });
+        }
+        
+        // Add message to chat
+        function addMessageToChat(message, sender) {
+            const messageElement = document.createElement('div');
+            messageElement.className = `${sender}-message chat-message`;
+            messageElement.innerHTML = `<p>${message}</p>`;
+            chatContainer.appendChild(messageElement);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+        
+        // Copy rule to clipboard
+        function copyRuleToClipboard() {
+            navigator.clipboard.writeText(currentRule).then(function() {
+                // Temporarily change button text
+                const originalText = copyButton.innerHTML;
+                copyButton.innerHTML = '<i class="fas fa-check"></i> Copied!';
+                setTimeout(() => {
+                    copyButton.innerHTML = originalText;
+                }, 2000);
+            }, function(err) {
+                console.error('Could not copy text: ', err);
+            });
+        }
+        
+        // Save rule
+        function saveRule() {
+            const ruleName = document.getElementById('ruleName').value.trim();
+            const ruleDescription = document.getElementById('ruleDescription').value.trim();
+            
+            if (ruleName === '') {
+                alert('Please enter a name for the rule');
+                return;
+            }
+            
+            // In a real application, this would save to a database or file
+            // For now, we'll just display a success message
+            saveRuleModal.hide();
+            
+            // Add success message to chat
+            addMessageToChat(`Rule "${ruleName}" has been saved successfully.`, 'bot');
+            
+            // Clear modal fields
+            document.getElementById('ruleName').value = '';
+            document.getElementById('ruleDescription').value = '';
+        }
+        
+        // Analyze traffic with AI models
+        function analyzeTraffic() {
+            const fileInput = document.getElementById('trafficFile');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('Please select a CSV file to analyze');
+                return;
+            }
+            
+            // Show loading indicator
+            analysisResult.innerHTML = `
+                <div class="text-center p-4">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p class="mt-3">Analyzing traffic data...</p>
+                </div>
+            `;
+            analysisResult.style.display = 'block';
+            
+            // Read and parse the CSV file
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const csv = e.target.result;
+                
+                // Parse CSV (simple parsing, might need to be improved)
+                const lines = csv.split('\n');
+                const headers = lines[0].split(',');
+                const trafficData = [];
+                
+                for (let i = 1; i < lines.length; i++) {
+                    if (lines[i].trim() === '') continue;
+                    
+                    const values = lines[i].split(',');
+                    const entry = {};
+                    
+                    for (let j = 0; j < headers.length; j++) {
+                        entry[headers[j].trim()] = values[j].trim();
+                    }
+                    
+                    trafficData.push(entry);
+                }
+                
+                // Send to backend for analysis
+                fetch('/api/analyze-traffic', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ traffic_data: trafficData })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        // Update UI with the results
+                        analysisResult.innerHTML = `
+                            <h6><i class="fas fa-chart-bar me-2"></i>Analysis Results:</h6>
+                            <div class="card mb-4">
+                                <div class="card-body">
+                                    <ul id="analysisDetails" class="list-group">
+                                        <!-- Results will be inserted here -->
+                                    </ul>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-4">
+                                <h6><i class="fas fa-shield-alt me-2"></i>Suggested Rules:</h6>
+                                <div id="suggestedRules" class="rule-display"></div>
+                                
+                                <div class="mt-3 text-end">
+                                    <button class="btn btn-sm btn-outline-primary me-2" id="copyAIRuleButton">
+                                        <i class="fas fa-copy"></i> Copy to Clipboard
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-success" id="saveAIRuleButton">
+                                        <i class="fas fa-save"></i> Save Rule
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                        
+                        // Display analysis details
+                        const analysisDetails = document.getElementById('analysisDetails');
+                        analysisDetails.innerHTML = '';
+                        
+                        const maliciousCount = data.results.malicious_traffic.filter(x => x === 1).length;
+                        const anomalyCount = data.results.anomalies.filter(x => x === -1).length;
+                        
+                        analysisDetails.innerHTML += `
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                Malicious Traffic Detected
+                                <span class="badge bg-danger rounded-pill">${maliciousCount}</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                Anomalies Detected
+                                <span class="badge bg-warning rounded-pill">${anomalyCount}</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                Total Records Analyzed
+                                <span class="badge bg-info rounded-pill">${trafficData.length}</span>
+                            </li>
+                        `;
+                        
+                        // Display suggested rules
+                        const suggestedRules = document.getElementById('suggestedRules');
+                        suggestedRules.textContent = data.suggested_rules.join('\n\n');
+                        
+                        // Update event listeners for the new buttons
+                        document.getElementById('copyAIRuleButton').addEventListener('click', () => {
+                            navigator.clipboard.writeText(suggestedRules.textContent)
+                                .then(() => {
+                                    const originalText = document.getElementById('copyAIRuleButton').innerHTML;
+                                    document.getElementById('copyAIRuleButton').innerHTML = '<i class="fas fa-check"></i> Copied!';
+                                    setTimeout(() => {
+                                        document.getElementById('copyAIRuleButton').innerHTML = originalText;
+                                    }, 2000);
+                                });
+                        });
+                        
+                        document.getElementById('saveAIRuleButton').addEventListener('click', () => {
+                            currentRule = suggestedRules.textContent;
+                            saveRuleModal.show();
+                            document.getElementById('ruleName').focus();
+                        });
+                        
+                        // Show the results
+                        analysisResult.style.display = 'block';
+                    } else {
+                        // Show error
+                        analysisResult.innerHTML = `
+                            <div class="alert alert-danger">
+                                <i class="fas fa-exclamation-circle me-2"></i>
+                                Error analyzing traffic data: ${data.message}
+                            </div>
+                        `;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    analysisResult.innerHTML = `
+                        <div class="alert alert-danger">
+                            <i class="fas fa-exclamation-circle me-2"></i>
+                            Error analyzing traffic data: ${error.message}
+                        </div>
+                    `;
+                });
+            };
+            
+            reader.readAsText(file);
+        }
+    </script>
+</body>
+</html>
