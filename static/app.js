@@ -147,6 +147,7 @@ function setupEventListeners() {
     stopBtn.addEventListener('click', stopMonitoring);
     generateReportBtn.addEventListener('click', generateReport);
     document.getElementById('downloadReportBtn').addEventListener('click', downloadReport);
+    document.getElementById('exportCSVButton').addEventListener('click', exportTrafficToCSV);
 }
 
 // Start monitoring
@@ -546,7 +547,47 @@ function generateReport() {
         `;
     }, 1000);
 }
+function exportTrafficToCSV() {
+    // Collect data from the alert table
+    const alertTableBody = document.getElementById('alertTableBody');
+    const rows = alertTableBody.querySelectorAll('tr');
+    
+    // Prepare CSV data
+    const csvData = [
+        ['Time', 'Type', 'Message', 'Source', 'Destination']
+    ];
+    
+    // Skip the "no data" row
+    rows.forEach(row => {
+        if (row.cells.length === 5) {
+            csvData.push([
+                row.cells[0].textContent,
+                row.cells[1].textContent,
+                row.cells[2].textContent,
+                row.cells[3].textContent,
+                row.cells[4].textContent
+            ]);
+        }
+    });
+    
+    // Convert to CSV string
+    const csvContent = csvData.map(e => e.map(String).map(v => v.replace(/,/g, ';')).join(',')).join('\n');
+    
+    // Create a Blob and download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', `snort_traffic_${new Date().toISOString().replace(/:/g, '-')}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 
+    // Optional: Show a success message
+    updateStatus('success', 'Traffic data exported successfully');
+}
 // Download report as PDF
 function downloadReport() {
     // Show loading message

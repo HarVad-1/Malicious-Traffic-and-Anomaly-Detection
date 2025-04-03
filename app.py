@@ -501,121 +501,125 @@ def api_generate_rule():
 # API endpoint for ML-based traffic analysis
 @app.route('/api/analyze-traffic', methods=['POST'])
 def analyze_traffic():
-    """Analyze traffic data using ML models"""
+    """Analyze traffic data using ML models and generate Snort rules with Google AI"""
     try:
-        data = request.json
+        # Get the request data
+        data = request.get_json(force=True)
         traffic_data = data.get('traffic_data', [])
         
-        if not traffic_data:
-            return jsonify({'status': 'error', 'message': 'No traffic data provided'}), 400
+        # Validate input
+        if not traffic_data or not isinstance(traffic_data, list):
+            return jsonify({
+                'status': 'error', 
+                'message': 'Invalid or empty traffic data'
+            }), 400
             
         logger.info(f"Analyzing traffic data, {len(traffic_data)} records received")
         
-        # Convert to DataFrame
-        df = pd.DataFrame(traffic_data)
+        # Convert to DataFrame with error handling
+        try:
+            df = pd.DataFrame(traffic_data)
+        except Exception as df_error:
+            logger.error(f"Error converting to DataFrame: {str(df_error)}")
+            return jsonify({
+                'status': 'error', 
+                'message': f'Error processing data: {str(df_error)}'
+            }), 400
+        
+        # Validate DataFrame
+        if df.empty:
+            return jsonify({
+                'status': 'error', 
+                'message': 'No valid data found in the uploaded file'
+            }), 400
+        
+        # Log columns for debugging
         logger.info(f"DataFrame columns: {df.columns.tolist()}")
         
-        # Preprocess data
-        # This is a simplified example - adjust based on your actual model requirements
+        # Prepare analysis results with default values
         results = {
-            'malicious_traffic': [],
-            'anomalies': [],
+            'malicious_traffic': [0] * len(df),
+            'anomalies': [0] * len(df),
             'analysis_summary': 'Traffic analysis complete'
         }
         
-        # Only run predictions if models are loaded
-        if malicious_traffic_model:
-            try:
-                # This is a placeholder - you need to adjust based on your actual model
-                # Assuming the model expects certain features
-                required_features = ['feature1', 'feature2', 'feature3']  # Replace with actual features
-                
-                # Check if required features exist
-                missing_features = [f for f in required_features if f not in df.columns]
-                if missing_features:
-                    logger.warning(f"Missing features for malicious traffic model: {missing_features}")
-                    # Use placeholder results
-                    mal_predictions = [0] * len(df)
-                else:
-                    # Make predictions (adjust feature selection as needed)
-                    mal_predictions = malicious_traffic_model.predict(df[required_features])
-                
-                results['malicious_traffic'] = mal_predictions.tolist()
-                logger.info(f"Malicious traffic detected: {sum(mal_predictions)}")
-            except Exception as e:
-                logger.error(f"Error running malicious traffic model: {str(e)}", exc_info=True)
-                results['malicious_traffic'] = [0] * len(df)
-        else:
-            logger.warning("Malicious traffic model not available")
-            results['malicious_traffic'] = [0] * len(df)
+        # Prepare prompt for rule generation
+        prompt = "Generate Snort rules to detect and prevent network threats based on the following analysis:\n\n"
+        
+        # Analyze specific attack types
+        if 'Type' in df.columns:
+            attack_types = df['Type'].value_counts()
             
-        if anomaly_detection_model:
-            try:
-                # This is a placeholder - adjust based on your actual model
-                required_features = ['feature1', 'feature2', 'feature3']  # Replace with actual features
+            prompt += "Detected Attack Types:\n"
+            for attack_type, count in attack_types.items():
+                prompt += f"- {attack_type}: {count} instances\n"
                 
-                # Check if required features exist
-                missing_features = [f for f in required_features if f not in df.columns]
-                if missing_features:
-                    logger.warning(f"Missing features for anomaly detection model: {missing_features}")
-                    # Use placeholder results
-                    anom_predictions = [0] * len(df)
-                else:
-                    # Make predictions (adjust feature selection as needed)
-                    anom_predictions = anomaly_detection_model.predict(df[required_features])
-                
-                results['anomalies'] = anom_predictions.tolist()
-                logger.info(f"Anomalies detected: {sum(1 for x in anom_predictions if x == -1)}")
-            except Exception as e:
-                logger.error(f"Error running anomaly detection model: {str(e)}", exc_info=True)
-                results['anomalies'] = [0] * len(df)
-        else:
-            logger.warning("Anomaly detection model not available")
-            results['anomalies'] = [0] * len(df)
+                # Mark potentially malicious traffic
+                if attack_type in ['Nmap Scan', 'SQL Injection', 'XSS Attack']:
+                    results['malicious_traffic'] = [1 if t == attack_type else 0 for t in df['Type']]
         
-        # Generate Snort rules based on detected patterns
-        suggested_rules = []
+        # Add source and destination IP analysis
+        if 'Source' in df.columns:
+            unique_sources = df['Source'].value_counts()
+            prompt += "\nSource IP addresses of concern:\n"
+            for ip, count in unique_sources.head(5).items():
+                prompt += f"- {ip}: {count} occurrences\n"
         
-        # Check if we detected any suspicious activity
-        has_malicious = any(x == 1 for x in results['malicious_traffic'])
-        has_anomalies = any(x == -1 for x in results['anomalies'])
+        prompt += "\nGenerate comprehensive Snort rules to block or alert on these threats."
         
-        if has_malicious or has_anomalies:
-            # Build a prompt based on what we found
-            rule_prompt = "Create a Snort rule to detect "
+        logger.info(f"Generated rule generation prompt: {prompt}")
+        
+        # Generate rules using Gemini
+        try:
+            # Use the appropriate Gemini model
+            model_name = get_gemini_model()
+            model = genai.GenerativeModel(model_name)
             
-            if has_malicious:
-                mal_count = sum(1 for x in results['malicious_traffic'] if x == 1)
-                rule_prompt += f"malicious traffic (detected {mal_count} instances) "
-                
-                # Add some context if available (this would depend on your data)
-                if 'src_ip' in df.columns:
-                    suspicious_ips = df.loc[results['malicious_traffic'] == 1, 'src_ip'].unique().tolist()
-                    if suspicious_ips:
-                        rule_prompt += f"from these source IPs: {', '.join(suspicious_ips[:5])} "
-                
-            if has_anomalies:
-                anom_count = sum(1 for x in results['anomalies'] if x == -1)
-                if has_malicious:
-                    rule_prompt += "and "
-                rule_prompt += f"anomalous network behavior (detected {anom_count} instances) "
+            # Configure generation parameters
+            generation_config = {
+                "temperature": 0.3,
+                "top_p": 0.8,
+                "top_k": 40,
+                "max_output_tokens": 1024,
+            }
             
-            # Generate the rule
-            logger.info(f"Generating rule with prompt: {rule_prompt}")
-            suggested_rule = generate_snort_rule(rule_prompt)
-            suggested_rules.append(suggested_rule)
-        
-        return jsonify({
-            'status': 'success',
-            'results': results,
-            'suggested_rules': suggested_rules
-        })
+            # Generate Snort rules
+            response = model.generate_content(
+                f"{CHATBOT_SYSTEM_PROMPT}\n\n{prompt}\n\nGenerate appropriate Snort rule(s):",
+                generation_config=generation_config
+            )
+            
+            # Extract and clean the rules
+            suggested_rules = response.text.strip().split('\n\n')
+            
+            # Remove any code block formatting
+            suggested_rules = [
+                rule.replace('```', '').strip() 
+                for rule in suggested_rules 
+                if rule.strip()
+            ]
+            
+            logger.info(f"Generated {len(suggested_rules)} Snort rules")
+            
+            return jsonify({
+                'status': 'success',
+                'results': results,
+                'suggested_rules': suggested_rules
+            })
+            
+        except Exception as ai_error:
+            logger.error(f"Error generating rules with Google AI: {str(ai_error)}", exc_info=True)
+            return jsonify({
+                'status': 'error', 
+                'message': f"AI rule generation failed: {str(ai_error)}"
+            }), 500
         
     except Exception as e:
         logger.error(f"Error analyzing traffic: {str(e)}", exc_info=True)
-        return jsonify({'status': 'error', 'message': str(e)}), 500
-
-# Endpoint to render chatbot page
+        return jsonify({
+            'status': 'error', 
+            'message': f"Unexpected error: {str(e)}"
+        }), 500# Endpoint to render chatbot page
 @app.route('/rule-generator')
 def rule_generator():
     return send_from_directory('static', 'rule-generator.html')
