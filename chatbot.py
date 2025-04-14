@@ -10,7 +10,7 @@ st.set_page_config(
 )
 
 # Configure API key directly - replace with your own key
-GOOGLE_API_KEY = "AIzaSyA_pM32Xic20HQehW0FpniewIrNKyalD8Y"  # Replace this with your actual API key
+GOOGLE_API_KEY = "xxxx"  # Replace this with your actual API key
 genai.configure(api_key=GOOGLE_API_KEY)
 
 # Styling
