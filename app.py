@@ -27,7 +27,7 @@ app = Flask(__name__, static_folder='static')
 CORS(app)  # Enable CORS for all routes
 
 # Configure Google Generative AI API
-GOOGLE_API_KEY= "AIzaSyCeSOVKuf2Gv_VvqQkEWhYGDyg-5vUrtEk"  # Replace with your actual API key  # Replace with your actual API key
+GOOGLE_API_KEY= "xxxx"  # Replace with your actual API key  # Replace with your actual API key
 genai.configure(api_key=GOOGLE_API_KEY)
 
 # Create models directory if it doesn't exist
